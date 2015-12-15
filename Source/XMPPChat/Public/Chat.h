@@ -47,6 +47,12 @@ protected:
 	// Map BP Enum EUXmppPresenceStatus mapping to non-BP EXmppPresenceStatus
 	EXmppPresenceStatus::Type GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status);
 
+	// has this chat's delegates been set up, etc.
+	bool bInited;
+
+	// has this chat been completed?
+	bool bDone;
+
 public:
 	UPROPERTY(BlueprintAssignable, Category = "Chat")
 	FOnChatLoginComplete OnChatLoginComplete;

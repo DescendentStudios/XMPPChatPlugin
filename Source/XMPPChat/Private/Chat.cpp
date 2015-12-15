@@ -9,7 +9,7 @@
 
 DEFINE_LOG_CATEGORY(LogChat);
 
-UChat::UChat(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UChat::UChat(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), bInited(false), bDone(false)
 {
 }
 
@@ -20,26 +20,33 @@ UChat::~UChat()
 
 void UChat::Init()
 {
-	IXmppConnection::FOnXmppLoginComplete& OnXMPPLoginCompleteDelegate = XmppConnection->OnLoginComplete();
-	OnLoginCompleteHandle = OnXMPPLoginCompleteDelegate.AddUObject(this, &UChat::OnLoginComplete);
+	if (XmppConnection.IsValid() && !bInited)
+	{
+		bInited = true;
 
-	IXmppConnection::FOnXmppLogoutComplete& OnXMPPLogoutCompleteDelegate = XmppConnection->OnLogoutComplete();
-	OnLogoutCompleteHandle = OnXMPPLogoutCompleteDelegate.AddUObject(this, &UChat::OnLogoutComplete);
-	
-	IXmppConnection::FOnXmppLogingChanged& OnXMPPLogingChangedDelegate = XmppConnection->OnLoginChanged();
-	OnLogingChangedHandle = OnXMPPLogingChangedDelegate.AddUObject(this, &UChat::OnLogingChanged);	
+		IXmppConnection::FOnXmppLoginComplete& OnXMPPLoginCompleteDelegate = XmppConnection->OnLoginComplete();
+		OnLoginCompleteHandle = OnXMPPLoginCompleteDelegate.AddUObject(this, &UChat::OnLoginComplete);
 
-	IXmppMessages::FOnXmppMessageReceived& OnXMPPReceiveMessageDelegate = XmppConnection->Messages()->OnReceiveMessage();
-	OnChatReceiveMessageHandle = OnXMPPReceiveMessageDelegate.AddUObject(this, &UChat::OnChatReceiveMessage);
+		IXmppConnection::FOnXmppLogoutComplete& OnXMPPLogoutCompleteDelegate = XmppConnection->OnLogoutComplete();
+		OnLogoutCompleteHandle = OnXMPPLogoutCompleteDelegate.AddUObject(this, &UChat::OnLogoutComplete);
 
-	IXmppMultiUserChat::FOnXmppRoomChatReceived& OnXMPPMUCReceiveMessageDelegate = XmppConnection->MultiUserChat()->OnRoomChatReceived();
-	OnMUCReceiveMessageHandle = OnXMPPMUCReceiveMessageDelegate.AddUObject(this, &UChat::OnMUCReceiveMessage);	
+		IXmppConnection::FOnXmppLogingChanged& OnXMPPLogingChangedDelegate = XmppConnection->OnLoginChanged();
+		OnLogingChangedHandle = OnXMPPLogingChangedDelegate.AddUObject(this, &UChat::OnLogingChanged);
+
+		IXmppMessages::FOnXmppMessageReceived& OnXMPPReceiveMessageDelegate = XmppConnection->Messages()->OnReceiveMessage();
+		OnChatReceiveMessageHandle = OnXMPPReceiveMessageDelegate.AddUObject(this, &UChat::OnChatReceiveMessage);
+
+		IXmppMultiUserChat::FOnXmppRoomChatReceived& OnXMPPMUCReceiveMessageDelegate = XmppConnection->MultiUserChat()->OnRoomChatReceived();
+		OnMUCReceiveMessageHandle = OnXMPPMUCReceiveMessageDelegate.AddUObject(this, &UChat::OnMUCReceiveMessage);
+	}
 }
 
 void UChat::DeInit()
 {
 	if (XmppConnection.IsValid())
 	{
+		bInited = false;
+
 		XmppConnection->OnLoginComplete().Remove(OnLoginCompleteHandle);
 		XmppConnection->OnLogoutComplete().Remove(OnLogoutCompleteHandle);
 		XmppConnection->OnLoginChanged().Remove(OnLogingChangedHandle);
@@ -66,11 +73,14 @@ void UChat::Login(const FString& UserId, const FString& Auth, const FXmppServer&
 
 	XmppConnection = Module.CreateConnection(UserId);
 
-	Init();
+	if (XmppConnection.IsValid())
+	{
+		Init();
 
-	XmppConnection->SetServer(XmppServer);	
-	
-	XmppConnection->Login(UserId, Auth);
+		XmppConnection->SetServer(XmppServer);
+
+		XmppConnection->Login(UserId, Auth);
+	}
 }
 
 
@@ -108,8 +118,7 @@ void UChat::OnMUCReceiveMessage(const TSharedRef<IXmppConnection>& Connection, c
 }
 
 void UChat::Finish()
-{
-	bool bDone = false;
+{	
 	if (XmppConnection.IsValid())
 	{
 		if (XmppConnection->GetLoginStatus() == EXmppLoginStatus::LoggedIn)
