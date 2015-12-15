@@ -114,7 +114,13 @@ void UChat::OnChatReceiveMessage(const TSharedRef<IXmppConnection>& Connection, 
 
 void UChat::OnMUCReceiveMessage(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg)
 {
-	OnMUCReceiveMessageDelegate.Broadcast(static_cast<FString>(RoomId), UserJid.GetFullPath(), *ChatMsg->Body);
+	TSharedPtr<FXmppChatMember> messageSender = Connection->MultiUserChat()->GetMember(RoomId, UserJid);
+	FString displayName = "Unknown User";
+	if (messageSender.IsValid())
+	{
+		displayName = messageSender->Nickname;
+	}
+	OnMUCReceiveMessageDelegate.Broadcast(static_cast<FString>(RoomId), displayName, *ChatMsg->Body);
 }
 
 void UChat::Finish()
