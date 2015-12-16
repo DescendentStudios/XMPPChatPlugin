@@ -44,7 +44,7 @@ namespace EUXmppLoginStatus
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLoginComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLogoutComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatLogingChanged, const FString&, UserJid, EUXmppLoginStatus::Type, LoginStatus);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatReceiveMessage, const FString&, UserJid, const FString&, Message);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatReceiveMessage, const FString&, UserJid, const FString&, Type, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPrivateChatReceiveMessage, const FString&, UserJid, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCReceiveMessage, const FString&, RoomId, const FString&, UserJid, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCRoomJoinPublicComplete, bool, bSuccess, const FString&, RoomId, const FString&, Error);
@@ -143,7 +143,7 @@ public:
 	void PresenceQuery(const FString& User);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void Message(const FString& UserName, const FString& Recipient, const FString& MessagePayload);
+	void Message(const FString& UserName, const FString& Recipient, const FString& Type, const FString& MessagePayload);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void PrivateChat(const FString& UserName, const FString& Recipient, const FString& Body);

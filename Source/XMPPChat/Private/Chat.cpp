@@ -119,9 +119,9 @@ void UChat::OnLogingChangedFunc(const FXmppUserJid& UserJid, EXmppLoginStatus::T
 
 void UChat::OnChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message)
 {
-	UE_LOG(LogChat, Log, TEXT("UChat::OnChatReceiveMessage UserJid=%s Message=%s"), *FromJid.GetFullPath(), *Message->Payload);
+	UE_LOG(LogChat, Log, TEXT("UChat::OnChatReceiveMessage UserJid=%s Type=%s Message=%s"), *FromJid.GetFullPath(), *Message->Type, *Message->Payload);
 
-	OnChatReceiveMessage.Broadcast(FromJid.GetFullPath(), Message->Payload);
+	OnChatReceiveMessage.Broadcast(FromJid.GetFullPath(), Message->Type, Message->Payload);
 }
 
 void UChat::OnPrivateChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppChatMessage>& Message)
@@ -186,14 +186,14 @@ void UChat::PresenceQuery(const FString& User)
 	}
 }
 
-void UChat::Message(const FString& UserName, const FString& Recipient, const FString& MessagePayload)
+void UChat::Message(const FString& UserName,  const FString& Recipient, const FString& Type, const FString& MessagePayload)
 {
 	if (XmppConnection->Messages().IsValid())
 	{		
 		FXmppMessage Message;
 		Message.FromJid.Id = UserName;
 		Message.ToJid.Id = Recipient;
-		Message.Type = TEXT("test");
+		Message.Type = Type;
 		Message.Payload = MessagePayload;
 		XmppConnection->Messages()->SendMessage(Recipient, Message);
 	}
