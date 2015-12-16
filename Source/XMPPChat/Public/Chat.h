@@ -26,12 +26,29 @@ namespace EUXmppPresenceStatus
 	};
 }
 
+/**
+* BP Enum EUXmppLoginStatus mapping to non-BP EXmppLoginStatus
+* Possible XMPP login states 
+*/
+UENUM(BlueprintType)
+namespace EUXmppLoginStatus
+{
+	enum Type
+	{
+		LoggedIn,
+		LoggedOut
+	};
+}
+
 /** Generate a delegates for callback events */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLoginComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLogoutComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
-//DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatLogingChanged, const FString&, UserJid, int, LoginStatus);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatLogingChanged, const FString&, UserJid, EUXmppLoginStatus::Type, LoginStatus);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatReceiveMessage, const FString&, UserJid, const FString&, Message);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPrivateChatReceiveMessage, const FString&, UserJid, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCReceiveMessage, const FString&, RoomId, const FString&, UserJid, const FString&, Message);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCRoomJoinPublicComplete, bool, bSuccess, const FString&, RoomId, const FString&, Error);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCRoomJoinPrivateComplete, bool, bSuccess, const FString&, RoomId, const FString&, Error);
 
 /**
 * Chat class representing a connection to a chat server
@@ -47,6 +64,9 @@ protected:
 	// Map BP Enum EUXmppPresenceStatus mapping to non-BP EXmppPresenceStatus
 	EXmppPresenceStatus::Type GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status);
 
+	// Map non-BP EXmppLoginStatus to BP Enum EUXmppLoginStatus 
+	EUXmppLoginStatus::Type GetEUXmppLoginStatus(EXmppLoginStatus::Type status);
+
 	// has this chat's delegates been set up, etc.
 	bool bInited;
 
@@ -54,6 +74,8 @@ protected:
 	bool bDone;
 
 public:
+	// Delegates for BP events
+
 	UPROPERTY(BlueprintAssignable, Category = "Chat")
 	FOnChatLoginComplete OnChatLoginComplete;
 
@@ -61,25 +83,46 @@ public:
 	FOnChatLogoutComplete OnChatLogoutComplete;
 
 	UPROPERTY(BlueprintAssignable, Category = "Chat")
-	FOnChatReceiveMessage OnChatReceiveMessageDelegate;
+	FOnChatLogingChanged OnChatLogingChanged;
 
 	UPROPERTY(BlueprintAssignable, Category = "Chat")
-	FOnMUCReceiveMessage OnMUCReceiveMessageDelegate;
+	FOnChatReceiveMessage OnChatReceiveMessage;
+
+	UPROPERTY(BlueprintAssignable, Category = "Chat")
+	FOnPrivateChatReceiveMessage OnPrivateChatReceiveMessage;
+
+	UPROPERTY(BlueprintAssignable, Category = "Chat")
+	FOnMUCReceiveMessage OnMUCReceiveMessage;
+
+	UPROPERTY(BlueprintAssignable, Category = "Chat")
+	FOnMUCRoomJoinPublicComplete OnMUCRoomJoinPublicComplete;
+
+	UPROPERTY(BlueprintAssignable, Category = "Chat")
+	FOnMUCRoomJoinPrivateComplete OnMUCRoomJoinPrivateComplete;
 
 public:
-	void OnLoginComplete(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error);
-	void OnLogoutComplete(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error);	
-	void OnLogingChanged(const FXmppUserJid& UserJid, EXmppLoginStatus::Type LoginStatus);
+	// Callbacks for delegates
 
-	void OnChatReceiveMessage(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message);
-	void OnMUCReceiveMessage(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg);
+	void OnLoginCompleteFunc(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error);
+	void OnLogoutCompleteFunc(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error);
+	void OnLogingChangedFunc(const FXmppUserJid& UserJid, EXmppLoginStatus::Type LoginStatus);
+
+	void OnChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message);
+	void OnPrivateChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppChatMessage>& Message);
+
+	void OnMUCReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg);
+	void OnMUCRoomJoinPublicCompleteFunc(const TSharedRef<IXmppConnection>& Connection, bool bSuccess, const FXmppRoomId& RoomId, const FString& Error);
+	void OnMUCRoomJoinPrivateCompleteFunc(const TSharedRef<IXmppConnection>& Connection, bool bSuccess, const FXmppRoomId& RoomId, const FString& Error);
 
 protected:
 	FDelegateHandle OnLoginCompleteHandle;
 	FDelegateHandle OnLogoutCompleteHandle;
 	FDelegateHandle OnLogingChangedHandle;
+	FDelegateHandle	OnPrivateChatReceiveMessageHandle;
 	FDelegateHandle OnChatReceiveMessageHandle;
 	FDelegateHandle OnMUCReceiveMessageHandle;
+	FDelegateHandle OnMUCRoomJoinPublicCompleteHandle;
+	FDelegateHandle OnMUCRoomJoinPrivateCompleteHandle;
 
 protected:
 	void Init();
@@ -144,4 +187,3 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void Finish();
 };
-

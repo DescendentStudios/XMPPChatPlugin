@@ -25,19 +25,28 @@ void UChat::Init()
 		bInited = true;
 
 		IXmppConnection::FOnXmppLoginComplete& OnXMPPLoginCompleteDelegate = XmppConnection->OnLoginComplete();
-		OnLoginCompleteHandle = OnXMPPLoginCompleteDelegate.AddUObject(this, &UChat::OnLoginComplete);
+		OnLoginCompleteHandle = OnXMPPLoginCompleteDelegate.AddUObject(this, &UChat::OnLoginCompleteFunc);
 
 		IXmppConnection::FOnXmppLogoutComplete& OnXMPPLogoutCompleteDelegate = XmppConnection->OnLogoutComplete();
-		OnLogoutCompleteHandle = OnXMPPLogoutCompleteDelegate.AddUObject(this, &UChat::OnLogoutComplete);
+		OnLogoutCompleteHandle = OnXMPPLogoutCompleteDelegate.AddUObject(this, &UChat::OnLogoutCompleteFunc);
 
 		IXmppConnection::FOnXmppLogingChanged& OnXMPPLogingChangedDelegate = XmppConnection->OnLoginChanged();
-		OnLogingChangedHandle = OnXMPPLogingChangedDelegate.AddUObject(this, &UChat::OnLogingChanged);
+		OnLogingChangedHandle = OnXMPPLogingChangedDelegate.AddUObject(this, &UChat::OnLogingChangedFunc);
 
 		IXmppMessages::FOnXmppMessageReceived& OnXMPPReceiveMessageDelegate = XmppConnection->Messages()->OnReceiveMessage();
-		OnChatReceiveMessageHandle = OnXMPPReceiveMessageDelegate.AddUObject(this, &UChat::OnChatReceiveMessage);
+		OnChatReceiveMessageHandle = OnXMPPReceiveMessageDelegate.AddUObject(this, &UChat::OnChatReceiveMessageFunc);
+
+		IXmppChat::FOnXmppChatReceived& OnXMPPChatReceivedDelegate = XmppConnection->PrivateChat()->OnReceiveChat();
+		OnPrivateChatReceiveMessageHandle = OnXMPPChatReceivedDelegate.AddUObject(this, &UChat::OnPrivateChatReceiveMessageFunc);
 
 		IXmppMultiUserChat::FOnXmppRoomChatReceived& OnXMPPMUCReceiveMessageDelegate = XmppConnection->MultiUserChat()->OnRoomChatReceived();
-		OnMUCReceiveMessageHandle = OnXMPPMUCReceiveMessageDelegate.AddUObject(this, &UChat::OnMUCReceiveMessage);
+		OnMUCReceiveMessageHandle = OnXMPPMUCReceiveMessageDelegate.AddUObject(this, &UChat::OnMUCReceiveMessageFunc);
+
+		IXmppMultiUserChat::FOnXmppRoomJoinPublicComplete& OnXMPPMUCRoomJoinPublicDelegate = XmppConnection->MultiUserChat()->OnJoinPublicRoom();
+		OnMUCRoomJoinPublicCompleteHandle = OnXMPPMUCRoomJoinPublicDelegate.AddUObject(this, &UChat::OnMUCRoomJoinPublicCompleteFunc);
+
+		IXmppMultiUserChat::FOnXmppRoomJoinPrivateComplete& OnXMPPMUCRoomJoinPrivateDelegate = XmppConnection->MultiUserChat()->OnJoinPrivateRoom();
+		OnMUCRoomJoinPrivateCompleteHandle = OnXMPPMUCRoomJoinPrivateDelegate.AddUObject(this, &UChat::OnMUCRoomJoinPrivateCompleteFunc);
 	}
 }
 
@@ -51,7 +60,10 @@ void UChat::DeInit()
 		XmppConnection->OnLogoutComplete().Remove(OnLogoutCompleteHandle);
 		XmppConnection->OnLoginChanged().Remove(OnLogingChangedHandle);
 		XmppConnection->Messages()->OnReceiveMessage().Remove(OnChatReceiveMessageHandle);
+		XmppConnection->PrivateChat()->OnReceiveChat().Remove(OnPrivateChatReceiveMessageHandle);
 		XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCReceiveMessageHandle);
+		XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCRoomJoinPublicCompleteHandle);
+		XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCRoomJoinPrivateCompleteHandle);
 
 		FXmppModule::Get().RemoveConnection(XmppConnection.ToSharedRef());
 	}	
@@ -84,35 +96,42 @@ void UChat::Login(const FString& UserId, const FString& Auth, const FXmppServer&
 }
 
 
-void UChat::OnLoginComplete(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error)
+void UChat::OnLoginCompleteFunc(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error)
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnLoginComplete UserJid=%s Success=%s Error=%s"),	*UserJid.GetFullPath(), bWasSuccess ? TEXT("true") : TEXT("false"), *Error);
 
 	OnChatLoginComplete.Broadcast(UserJid.GetFullPath(), bWasSuccess, Error);
 }
 
-void UChat::OnLogoutComplete(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error)
+void UChat::OnLogoutCompleteFunc(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error)
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnLogoutComplete UserJid=%s Success=%s Error=%s"), *UserJid.GetFullPath(), bWasSuccess ? TEXT("true") : TEXT("false"), *Error);	
 
 	OnChatLogoutComplete.Broadcast(UserJid.GetFullPath(), bWasSuccess, Error);
 }
 
-void UChat::OnLogingChanged(const FXmppUserJid& UserJid, EXmppLoginStatus::Type LoginStatus)
+void UChat::OnLogingChangedFunc(const FXmppUserJid& UserJid, EXmppLoginStatus::Type LoginStatus)
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnLogingChanged UserJid=%s LoginStatus=%d"), *UserJid.GetFullPath(), static_cast<int32>(LoginStatus));
 
-	//OnChatLogingChanged.Broadcast(UserJid.GetFullPath(), LoginStatus);
+	OnChatLogingChanged.Broadcast(UserJid.GetFullPath(), GetEUXmppLoginStatus(LoginStatus));
 }
 
-void UChat::OnChatReceiveMessage(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message)
+void UChat::OnChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message)
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnChatReceiveMessage UserJid=%s Message=%s"), *FromJid.GetFullPath(), *Message->Payload);
 
-	OnChatReceiveMessageDelegate.Broadcast(FromJid.GetFullPath(), Message->Payload);
+	OnChatReceiveMessage.Broadcast(FromJid.GetFullPath(), Message->Payload);
 }
 
-void UChat::OnMUCReceiveMessage(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg)
+void UChat::OnPrivateChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppChatMessage>& Message)
+{
+	UE_LOG(LogChat, Log, TEXT("UChat::OnPrivateChatReceiveMessage UserJid=%s Message=%s"), *FromJid.GetFullPath(), *Message->Body);
+
+	OnPrivateChatReceiveMessage.Broadcast(FromJid.GetFullPath(), Message->Body);
+}
+
+void UChat::OnMUCReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg)
 {
 	TSharedPtr<FXmppChatMember> messageSender = Connection->MultiUserChat()->GetMember(RoomId, UserJid);
 	FString displayName = "Unknown User";
@@ -120,7 +139,17 @@ void UChat::OnMUCReceiveMessage(const TSharedRef<IXmppConnection>& Connection, c
 	{
 		displayName = messageSender->Nickname;
 	}
-	OnMUCReceiveMessageDelegate.Broadcast(static_cast<FString>(RoomId), displayName, *ChatMsg->Body);
+	OnMUCReceiveMessage.Broadcast(static_cast<FString>(RoomId), displayName, *ChatMsg->Body);
+}
+
+void UChat::OnMUCRoomJoinPublicCompleteFunc(const TSharedRef<IXmppConnection>& Connection, bool bSuccess, const FXmppRoomId& RoomId, const FString& Error)
+{
+	OnMUCRoomJoinPublicComplete.Broadcast(bSuccess, static_cast<FString>(RoomId), Error);
+}
+
+void UChat::OnMUCRoomJoinPrivateCompleteFunc(const TSharedRef<IXmppConnection>& Connection, bool bSuccess, const FXmppRoomId& RoomId, const FString& Error)
+{
+	OnMUCRoomJoinPrivateComplete.Broadcast(bSuccess, static_cast<FString>(RoomId), Error);
 }
 
 void UChat::Finish()
@@ -135,20 +164,6 @@ void UChat::Finish()
 		{
 			bDone = true;
 		}
-	}
-}
-
-EXmppPresenceStatus::Type UChat::GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status)
-{
-	switch (Status)
-	{
-		case EUXmppPresenceStatus::Online: return EXmppPresenceStatus::Online;
-		case EUXmppPresenceStatus::Offline: return EXmppPresenceStatus::Offline;
-		case EUXmppPresenceStatus::Away: return EXmppPresenceStatus::Away;
-		case EUXmppPresenceStatus::ExtendedAway: return EXmppPresenceStatus::ExtendedAway;
-		case EUXmppPresenceStatus::DoNotDisturb: return EXmppPresenceStatus::DoNotDisturb;
-		default:
-		case EUXmppPresenceStatus::Chat: return EXmppPresenceStatus::Chat;
 	}
 }
 
@@ -307,6 +322,30 @@ void UChat::PubSubPublish(const FString& NodeId, const FString& Payload)
 		FXmppPubSubMessage Message;
 		Message.Payload = Payload;
 		XmppConnection->PubSub()->PublishMessage(NodeId, Message);
+	}
+}
+
+EXmppPresenceStatus::Type UChat::GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status)
+{
+	switch (Status)
+	{
+	case EUXmppPresenceStatus::Online: return EXmppPresenceStatus::Online;
+	case EUXmppPresenceStatus::Offline: return EXmppPresenceStatus::Offline;
+	case EUXmppPresenceStatus::Away: return EXmppPresenceStatus::Away;
+	case EUXmppPresenceStatus::ExtendedAway: return EXmppPresenceStatus::ExtendedAway;
+	case EUXmppPresenceStatus::DoNotDisturb: return EXmppPresenceStatus::DoNotDisturb;
+	default:
+	case EUXmppPresenceStatus::Chat: return EXmppPresenceStatus::Chat;
+	}
+}
+
+EUXmppLoginStatus::Type UChat::GetEUXmppLoginStatus(EXmppLoginStatus::Type status)
+{
+	switch (status)
+	{
+	case EXmppLoginStatus::LoggedIn: return EUXmppLoginStatus::LoggedIn;
+	default:
+	case EXmppLoginStatus::LoggedOut: return EUXmppLoginStatus::LoggedOut;
 	}
 }
 
