@@ -92,15 +92,24 @@ void UChat::Login(const FString& UserId, const FString& Auth, const FXmppServer&
 {
 	FXmppModule& Module = FModuleManager::GetModuleChecked<FXmppModule>("XMPP");
 
+	UE_LOG(LogChat, Log, TEXT("UChat::Login enables=%s UserId=%s"), Module.IsXmppEnabled() ? "true" : "false", *UserId );
+
 	XmppConnection = Module.CreateConnection(UserId);
 
 	if (XmppConnection.IsValid())
 	{
+		//UE_LOG(LogChat, Log, TEXT("UChat::Login XmppConnection is %s"), typeid(*XmppConnection).name() );
+		UE_LOG(LogChat, Log, TEXT("UChat::Login XmppConnection valid") );
+
 		Init();
 
 		XmppConnection->SetServer(XmppServer);
 
 		XmppConnection->Login(UserId, Auth);
+	}
+	else
+	{
+		UE_LOG(LogChat, Error, TEXT("UChat::Login XmppConnection not valid, failed.  UserId=%s"), *UserId );
 	}
 }
 
