@@ -40,6 +40,77 @@ namespace EUXmppLoginStatus
 	};
 }
 
+/**
+* BP Enum EXmppChatMemberRole mapping to non-BP EUChatMemberRole
+* Role of a chat room member
+*/
+UENUM(BlueprintType)
+namespace EUChatMemberRole
+{
+	enum Type
+	{
+		Owner,
+		Moderator,
+		Member,
+		None,
+		Outcast
+	};
+}
+
+namespace UChatUtil
+{
+	inline EXmppPresenceStatus::Type GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status)
+	{
+		switch (Status)
+		{
+		case EUXmppPresenceStatus::Online: return EXmppPresenceStatus::Online;
+		case EUXmppPresenceStatus::Offline: return EXmppPresenceStatus::Offline;
+		case EUXmppPresenceStatus::Away: return EXmppPresenceStatus::Away;
+		case EUXmppPresenceStatus::ExtendedAway: return EXmppPresenceStatus::ExtendedAway;
+		case EUXmppPresenceStatus::DoNotDisturb: return EXmppPresenceStatus::DoNotDisturb;
+		default:
+		case EUXmppPresenceStatus::Chat: return EXmppPresenceStatus::Chat;
+		}
+	}
+
+	inline EUXmppPresenceStatus::Type GetEUXmppPresenceStatus(const EXmppPresenceStatus::Type Status)
+	{
+		switch (Status)
+		{
+		case EXmppPresenceStatus::Online: return EUXmppPresenceStatus::Online;
+		case EXmppPresenceStatus::Offline: return EUXmppPresenceStatus::Offline;
+		case EXmppPresenceStatus::Away: return EUXmppPresenceStatus::Away;
+		case EXmppPresenceStatus::ExtendedAway: return EUXmppPresenceStatus::ExtendedAway;
+		case EXmppPresenceStatus::DoNotDisturb: return EUXmppPresenceStatus::DoNotDisturb;
+		default:
+		case EXmppPresenceStatus::Chat: return EUXmppPresenceStatus::Chat;
+		}
+	}
+
+	inline EUXmppLoginStatus::Type GetEUXmppLoginStatus(EXmppLoginStatus::Type status)
+	{
+		switch (status)
+		{
+		case EXmppLoginStatus::LoggedIn: return EUXmppLoginStatus::LoggedIn;
+		default:
+		case EXmppLoginStatus::LoggedOut: return EUXmppLoginStatus::LoggedOut;
+		}
+	}
+
+	inline EUChatMemberRole::Type GetEUChatMemberRole(const EXmppChatMemberRole::Type Status)
+	{
+		switch (Status)
+		{
+		case EXmppChatMemberRole::Owner: return EUChatMemberRole::Owner;
+		case EXmppChatMemberRole::Moderator: return EUChatMemberRole::Moderator;
+		case EXmppChatMemberRole::Member: return EUChatMemberRole::Member;
+		case EXmppChatMemberRole::None: return EUChatMemberRole::None;
+		default:
+		case EXmppChatMemberRole::Outcast: return EUChatMemberRole::Outcast;
+		}
+	}
+}
+
 /** Generate a delegates for callback events */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLoginComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatLogoutComplete, const FString&, UserJid, bool, bWasSuccess, const FString&, Error);
@@ -49,6 +120,51 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPrivateChatReceiveMessage, const
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCReceiveMessage, const FString&, RoomId, const FString&, UserJid, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCRoomJoinPublicComplete, bool, bSuccess, const FString&, RoomId, const FString&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnMUCRoomJoinPrivateComplete, bool, bSuccess, const FString&, RoomId, const FString&, Error);
+
+
+/**
+* BP version of FXmppChatMember
+* Member of a chat room
+*/
+UCLASS(BlueprintType, Blueprintable)
+class UChatMember : public UObject
+{
+public:
+
+	GENERATED_UCLASS_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString Nickname;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString MemberJid;
+
+	/** state of basic online status */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	TEnumAsByte<EUXmppPresenceStatus::Type> Status;
+
+	/** connected an available to receive messages */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	bool bIsAvailable;
+
+	/** time when presence was sent by the user */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FDateTime SentTime;
+
+	/** client id user is logged in from */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString ClientResource;
+
+	/** string that will be parsed for further displayed presence info */
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	FString StatusStr;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Chat")
+	TEnumAsByte<EUChatMemberRole::Type> Affiliation;
+
+	void ConvertFrom(const FXmppChatMember& ChatMember);
+};
+
 
 /**
 * Chat class representing a connection to a chat server
@@ -131,10 +247,30 @@ protected:
 public:
 	~UChat();
 
+	/***************** Base **************************/
+
+	UFUNCTION(BlueprintCallable, Category = "Chat")
+		void Finish();
+
+	/***************** Login/Logout **************************/
+
 	void Login(const FString& UserId, const FString& Auth, const FXmppServer& XmppServer);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void Login(const FString& UserId, const FString& Auth, const FString& ServerAddr, const FString& Domain, const FString& ClientResource);
+
+	UFUNCTION(BlueprintCallable, Category = "Chat")
+	void Logout();
+
+	/***************** Chat **************************/
+
+	UFUNCTION(BlueprintCallable, Category = "Chat")
+	void Message(const FString& UserName, const FString& Recipient, const FString& Type, const FString& MessagePayload);
+
+	UFUNCTION(BlueprintCallable, Category = "Chat")
+	void PrivateChat(const FString& UserName, const FString& Recipient, const FString& Body);
+
+	/***************** Presence **************************/
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void Presence(bool bIsAvailable, EUXmppPresenceStatus::Type Status, const FString& StatusStr);
@@ -143,10 +279,9 @@ public:
 	void PresenceQuery(const FString& User);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void Message(const FString& UserName, const FString& Recipient, const FString& Type, const FString& MessagePayload);
+	void PresenceGetRosterMembers(TArray<FString>& Members);
 
-	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void PrivateChat(const FString& UserName, const FString& Recipient, const FString& Body);
+	/***************** MUC **************************/
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void MucCreate(const FString& UserName, const FString& RoomId, bool bIsPrivate = false, const FString& Password = "");
@@ -167,6 +302,11 @@ public:
 	void MucRefresh(const FString& RoomId);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
+	void MucGetMembers(const FString& RoomId, TArray<UChatMember*>& Members);
+
+	/***************** PubSub **************************/
+
+	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void PubSubCreate(const FString& NodeId);
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
@@ -180,10 +320,4 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Chat")
 	void PubSubPublish(const FString& NodeId, const FString& Payload);
-
-	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void Logout();
-
-	UFUNCTION(BlueprintCallable, Category = "Chat")
-	void Finish();
 };

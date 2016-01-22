@@ -9,6 +9,28 @@
 
 DEFINE_LOG_CATEGORY(LogChat);
 
+UChatMember::UChatMember(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer),
+	Status(EUXmppPresenceStatus::Offline),
+	bIsAvailable(false),
+	Affiliation(EUChatMemberRole::Member)
+{
+}
+
+void UChatMember::ConvertFrom(const FXmppChatMember& ChatMember)
+{
+	Nickname = ChatMember.Nickname;
+	MemberJid = ChatMember.MemberJid.GetFullPath();
+	Status = UChatUtil::GetEUXmppPresenceStatus(ChatMember.UserPresence.Status);
+	bIsAvailable = ChatMember.UserPresence.bIsAvailable;
+	SentTime = ChatMember.UserPresence.SentTime;
+	ClientResource = ChatMember.UserPresence.ClientResource;
+	//NickName = ChatMember.UserPresence.NickName;
+	StatusStr = ChatMember.UserPresence.StatusStr;
+	Affiliation = UChatUtil::GetEUChatMemberRole(ChatMember.Affiliation);
+}
+
+/***************** Base **************************/
+
 UChat::UChat(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), bInited(false), bDone(false)
 {
 }
@@ -78,6 +100,23 @@ void UChat::DeInit()
 	}	
 }
 
+void UChat::Finish()
+{
+	if (XmppConnection.IsValid())
+	{
+		if (XmppConnection->GetLoginStatus() == EXmppLoginStatus::LoggedIn)
+		{
+			Logout();
+		}
+		else
+		{
+			bDone = true;
+		}
+	}
+}
+
+/***************** Login/Logout **************************/
+
 void UChat::Login(const FString& UserId, const FString& Auth, const FString& ServerAddr, const FString& Domain, const FString& ClientResource)
 {
 	FXmppServer XmppServer;
@@ -113,7 +152,6 @@ void UChat::Login(const FString& UserId, const FString& Auth, const FXmppServer&
 	}
 }
 
-
 void UChat::OnLoginCompleteFunc(const FXmppUserJid& UserJid, bool bWasSuccess, const FString& Error)
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnLoginComplete UserJid=%s Success=%s Error=%s"),	*UserJid.GetFullPath(), bWasSuccess ? TEXT("true") : TEXT("false"), *Error);
@@ -132,8 +170,18 @@ void UChat::OnLogingChangedFunc(const FXmppUserJid& UserJid, EXmppLoginStatus::T
 {
 	UE_LOG(LogChat, Log, TEXT("UChat::OnLogingChanged UserJid=%s LoginStatus=%d"), *UserJid.GetFullPath(), static_cast<int32>(LoginStatus));
 
-	OnChatLogingChanged.Broadcast(UserJid.GetFullPath(), GetEUXmppLoginStatus(LoginStatus));
+	OnChatLogingChanged.Broadcast(UserJid.GetFullPath(), UChatUtil::GetEUXmppLoginStatus(LoginStatus));
 }
+
+void UChat::Logout()
+{
+	if (XmppConnection.IsValid() && (XmppConnection->GetLoginStatus() == EXmppLoginStatus::LoggedIn))
+	{
+		XmppConnection->Logout();
+	}
+}
+
+/***************** Chat **************************/
 
 void UChat::OnChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppUserJid& FromJid, const TSharedRef<FXmppMessage>& Message)
 {
@@ -148,6 +196,71 @@ void UChat::OnPrivateChatReceiveMessageFunc(const TSharedRef<IXmppConnection>& C
 
 	OnPrivateChatReceiveMessage.Broadcast(FromJid.GetFullPath(), Message->Body);
 }
+
+void UChat::Message(const FString& UserName, const FString& Recipient, const FString& Type, const FString& MessagePayload)
+{
+	if (XmppConnection->Messages().IsValid())
+	{
+		FXmppMessage Message;
+		Message.FromJid.Id = UserName;
+		Message.ToJid.Id = Recipient;
+		Message.Type = Type;
+		Message.Payload = MessagePayload;
+		XmppConnection->Messages()->SendMessage(Recipient, Message);
+	}
+}
+
+void UChat::PrivateChat(const FString& UserName, const FString& Recipient, const FString& Body)
+{
+	if (XmppConnection->PrivateChat().IsValid())
+	{
+		FXmppChatMessage ChatMessage;
+		ChatMessage.FromJid.Id = UserName;
+		ChatMessage.ToJid.Id = Recipient;
+		ChatMessage.Body = Body;
+		XmppConnection->PrivateChat()->SendChat(Recipient, ChatMessage);
+	}
+}
+
+
+/***************** Presence **************************/
+
+void UChat::Presence(bool bIsAvailable, EUXmppPresenceStatus::Type Status, const FString& StatusStr)
+{
+	if (XmppConnection->Presence().IsValid())
+	{		
+		FXmppUserPresence XmppPresence = XmppConnection->Presence()->GetPresence();
+		XmppPresence.bIsAvailable = bIsAvailable;
+		XmppPresence.Status = UChatUtil::GetEXmppPresenceStatus(Status);
+		XmppConnection->Presence()->UpdatePresence(XmppPresence);
+	}
+}
+
+void UChat::PresenceQuery(const FString& User)
+{
+	if (XmppConnection->Presence().IsValid())
+	{
+		XmppConnection->Presence()->QueryPresence(User);
+	}
+}
+
+void UChat::PresenceGetRosterMembers(TArray<FString>& Members)
+{
+	if (XmppConnection->Presence().IsValid())
+	{
+		XmppConnection->Presence()->GetRosterMembers(Members);
+	}
+}
+
+// TODO:
+// FXmppUserPresenceJingle and FXmppUserPresence
+// TArray<TSharedPtr<FXmppUserPresence>> FXmppPresenceJingle::GetRosterPresence(const FString& UserId)
+// virtual FOnXmppPresenceReceived& OnReceivePresence() override { return OnXmppPresenceReceivedDelegate; }
+// Needed?
+// 	virtual bool UpdatePresence(const FXmppUserPresence& Presence) override;
+//	virtual const FXmppUserPresence& GetPresence() const override;
+
+/***************** MUC **************************/
 
 void UChat::OnMUCReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid, const TSharedRef<FXmppChatMessage>& ChatMsg)
 {
@@ -173,72 +286,6 @@ void UChat::OnMUCRoomJoinPrivateCompleteFunc(const TSharedRef<IXmppConnection>& 
 	OnMUCRoomJoinPrivateComplete.Broadcast(bSuccess, static_cast<FString>(RoomId), Error);
 }
 
-void UChat::Finish()
-{	
-	if (XmppConnection.IsValid())
-	{
-		if (XmppConnection->GetLoginStatus() == EXmppLoginStatus::LoggedIn)
-		{
-			Logout();
-		}
-		else
-		{
-			bDone = true;
-		}
-	}
-}
-
-void UChat::Presence(bool bIsAvailable, EUXmppPresenceStatus::Type Status, const FString& StatusStr)
-{
-	if (XmppConnection->Presence().IsValid())
-	{		
-		FXmppUserPresence XmppPresence = XmppConnection->Presence()->GetPresence();
-		XmppPresence.bIsAvailable = bIsAvailable;
-		XmppPresence.Status = GetEXmppPresenceStatus(Status);
-		XmppConnection->Presence()->UpdatePresence(XmppPresence);
-	}
-}
-
-void UChat::PresenceQuery(const FString& User)
-{
-	if (XmppConnection->Presence().IsValid())
-	{
-		XmppConnection->Presence()->QueryPresence(User);
-	}
-}
-
-void UChat::Message(const FString& UserName,  const FString& Recipient, const FString& Type, const FString& MessagePayload)
-{
-	if (XmppConnection->Messages().IsValid())
-	{		
-		FXmppMessage Message;
-		Message.FromJid.Id = UserName;
-		Message.ToJid.Id = Recipient;
-		Message.Type = Type;
-		Message.Payload = MessagePayload;
-		XmppConnection->Messages()->SendMessage(Recipient, Message);
-	}
-}
-
-void UChat::PrivateChat(const FString& UserName, const FString& Recipient, const FString& Body)
-{
-	if (XmppConnection->PrivateChat().IsValid())
-	{
-		FXmppChatMessage ChatMessage;
-		ChatMessage.FromJid.Id = UserName;
-		ChatMessage.ToJid.Id = Recipient;
-		ChatMessage.Body = Body;
-		XmppConnection->PrivateChat()->SendChat(Recipient, ChatMessage);
-	}
-}
-
-void UChat::Logout()
-{
-	if (XmppConnection.IsValid() && (XmppConnection->GetLoginStatus() == EXmppLoginStatus::LoggedIn))
-	{
-		XmppConnection->Logout();		
-	}
-}
 
 void UChat::MucCreate(const FString& UserName, const FString& RoomId, bool bIsPrivate, const FString& Password)
 {
@@ -303,6 +350,26 @@ void UChat::MucRefresh(const FString& RoomId)
 	}
 }
 
+void UChat::MucGetMembers(const FString& RoomId, TArray<UChatMember*>& Members)
+{
+	if (XmppConnection.IsValid() && XmppConnection->MultiUserChat().IsValid())
+	{
+		TArray< TSharedRef<FXmppChatMember> > OutMembers;
+		XmppConnection->MultiUserChat()->GetMembers(RoomId, OutMembers);
+
+		Members.Empty();
+		Members.Reserve(OutMembers.Num());
+		for (auto& Member : OutMembers)
+		{
+			UChatMember* UMember = NewObject<UChatMember>();
+			UMember->ConvertFrom(Member.Get());
+			Members.Add(UMember);
+		}
+	}
+}
+
+/***************** PubSub **************************/
+
 void UChat::PubSubCreate(const FString& NodeId)
 {
 	if (XmppConnection.IsValid() && XmppConnection->PubSub().IsValid())
@@ -343,30 +410,6 @@ void UChat::PubSubPublish(const FString& NodeId, const FString& Payload)
 		FXmppPubSubMessage Message;
 		Message.Payload = Payload;
 		XmppConnection->PubSub()->PublishMessage(NodeId, Message);
-	}
-}
-
-EXmppPresenceStatus::Type UChat::GetEXmppPresenceStatus(const EUXmppPresenceStatus::Type Status)
-{
-	switch (Status)
-	{
-	case EUXmppPresenceStatus::Online: return EXmppPresenceStatus::Online;
-	case EUXmppPresenceStatus::Offline: return EXmppPresenceStatus::Offline;
-	case EUXmppPresenceStatus::Away: return EXmppPresenceStatus::Away;
-	case EUXmppPresenceStatus::ExtendedAway: return EXmppPresenceStatus::ExtendedAway;
-	case EUXmppPresenceStatus::DoNotDisturb: return EXmppPresenceStatus::DoNotDisturb;
-	default:
-	case EUXmppPresenceStatus::Chat: return EXmppPresenceStatus::Chat;
-	}
-}
-
-EUXmppLoginStatus::Type UChat::GetEUXmppLoginStatus(EXmppLoginStatus::Type status)
-{
-	switch (status)
-	{
-	case EXmppLoginStatus::LoggedIn: return EUXmppLoginStatus::LoggedIn;
-	default:
-	case EXmppLoginStatus::LoggedOut: return EUXmppLoginStatus::LoggedOut;
 	}
 }
 
