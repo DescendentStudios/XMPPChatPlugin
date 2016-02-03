@@ -266,13 +266,7 @@ void UChat::OnMUCReceiveMessageFunc(const TSharedRef<IXmppConnection>& Connectio
 {
 	if (Connection->MultiUserChat().IsValid())
 	{
-		TSharedPtr<FXmppChatMember> messageSender = Connection->MultiUserChat()->GetMember(RoomId, UserJid);
-		FString displayName = "Unknown User";
-		if (messageSender.IsValid())
-		{
-			displayName = messageSender->Nickname;
-		}
-		OnMUCReceiveMessage.Broadcast(static_cast<FString>(RoomId), displayName, *ChatMsg->Body);
+		OnMUCReceiveMessage.Broadcast(static_cast<FString>(RoomId), UserJid.Resource, *ChatMsg->Body);
 	}
 }
 
