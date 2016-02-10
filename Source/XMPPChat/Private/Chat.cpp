@@ -133,7 +133,7 @@ void UChat::Login(const FString& UserId, const FString& Auth, const FXmppServer&
 
 	UE_LOG(LogChat, Log, TEXT("UChat::Login enabled=%s UserId=%s"), (Module.IsXmppEnabled() ? TEXT("true") : TEXT("false")), *UserId );
 
-	XmppConnection = Module.CreateConnection(UserId);
+	XmppConnection = Module.`(UserId);
 
 	if (XmppConnection.IsValid())
 	{
