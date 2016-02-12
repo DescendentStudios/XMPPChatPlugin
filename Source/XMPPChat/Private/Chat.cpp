@@ -293,17 +293,20 @@ void UChat::OnMUCRoomJoinPrivateCompleteFunc(const TSharedRef<IXmppConnection>& 
 }
 
 void UChat::OnMUCRoomMemberJoinFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
-{
+{	
+	UE_LOG(LogChat, Log, TEXT("UChat::OnMUCRoomMemberJoin RoomId=%s UserJid=%s"), *static_cast<FString>(RoomId), *UserJid.GetFullPath());
 	OnMUCRoomMemberJoin.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
 }
 
 void UChat::OnMUCRoomMemberExitFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
 {
+	UE_LOG(LogChat, Log, TEXT("UChat::OnMUCRoomMemberExit RoomId=%s UserJid=%s"), *static_cast<FString>(RoomId), *UserJid.GetFullPath());
 	OnMUCRoomMemberExit.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
 }
 
 void UChat::OnMUCRoomMemberChangedFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
 {
+	UE_LOG(LogChat, Log, TEXT("UChat::OnMUCRoomMemberChanged RoomId=%s UserJid=%s"), *static_cast<FString>(RoomId), *UserJid.GetFullPath());
 	OnMUCRoomMemberChanged.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
 }
 

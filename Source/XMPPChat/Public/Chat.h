@@ -7,7 +7,7 @@
 #include "Chat.generated.h"
 
 
-DECLARE_LOG_CATEGORY_EXTERN(LogChat, Warning, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogChat, Log, All);
 
 /**
 * BP Enum EUXmppPresenceStatus mapping to non-BP EXmppPresenceStatus
