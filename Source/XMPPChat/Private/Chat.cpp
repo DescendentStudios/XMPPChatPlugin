@@ -77,6 +77,15 @@ void UChat::Init()
 
 			IXmppMultiUserChat::FOnXmppRoomJoinPrivateComplete& OnXMPPMUCRoomJoinPrivateDelegate = XmppConnection->MultiUserChat()->OnJoinPrivateRoom();
 			OnMUCRoomJoinPrivateCompleteHandle = OnXMPPMUCRoomJoinPrivateDelegate.AddUObject(this, &UChat::OnMUCRoomJoinPrivateCompleteFunc);
+
+			IXmppMultiUserChat::FOnXmppRoomMemberJoin& OnXMPPRoomMemberJoinDelegate = XmppConnection->MultiUserChat()->OnRoomMemberJoin();
+			OnMUCRoomMemberJoinHandle = OnXMPPRoomMemberJoinDelegate.AddUObject(this, &UChat::OnMUCRoomMemberJoinFunc);
+
+			IXmppMultiUserChat::FOnXmppRoomMemberExit& OnXMPPRoomMemberExitDelegate = XmppConnection->MultiUserChat()->OnRoomMemberExit();
+			OnMUCRoomMemberExitHandle = OnXMPPRoomMemberExitDelegate.AddUObject(this, &UChat::OnMUCRoomMemberExitFunc);
+
+			IXmppMultiUserChat::FOnXmppRoomMemberChanged& OnXMPPRoomMemberChangedDelegate = XmppConnection->MultiUserChat()->OnRoomMemberChanged();
+			OnMUCRoomMemberChangedHandle = OnXMPPRoomMemberChangedDelegate.AddUObject(this, &UChat::OnMUCRoomMemberChangedFunc);
 		}
 	}
 }
@@ -93,8 +102,11 @@ void UChat::DeInit()
 		if (OnChatReceiveMessageHandle.IsValid()) { XmppConnection->Messages()->OnReceiveMessage().Remove(OnChatReceiveMessageHandle); }
 		if (OnPrivateChatReceiveMessageHandle.IsValid()) { XmppConnection->PrivateChat()->OnReceiveChat().Remove(OnPrivateChatReceiveMessageHandle); }
 		if (OnMUCReceiveMessageHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCReceiveMessageHandle); }
-		if (OnMUCRoomJoinPublicCompleteHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCRoomJoinPublicCompleteHandle); }
-		if (OnMUCRoomJoinPrivateCompleteHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomChatReceived().Remove(OnMUCRoomJoinPrivateCompleteHandle); }
+		if (OnMUCRoomJoinPublicCompleteHandle.IsValid()) { XmppConnection->MultiUserChat()->OnJoinPublicRoom().Remove(OnMUCRoomJoinPublicCompleteHandle); }
+		if (OnMUCRoomJoinPrivateCompleteHandle.IsValid()) { XmppConnection->MultiUserChat()->OnJoinPrivateRoom().Remove(OnMUCRoomJoinPrivateCompleteHandle); }
+		if (OnMUCRoomMemberJoinHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomMemberJoin().Remove(OnMUCRoomMemberJoinHandle); }
+		if (OnMUCRoomMemberExitHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomMemberExit().Remove(OnMUCRoomMemberExitHandle); }
+		if (OnMUCRoomMemberChangedHandle.IsValid()) { XmppConnection->MultiUserChat()->OnRoomMemberChanged().Remove(OnMUCRoomMemberChangedHandle); }
 
 		FXmppModule::Get().RemoveConnection(XmppConnection.ToSharedRef());
 	}	
@@ -280,6 +292,20 @@ void UChat::OnMUCRoomJoinPrivateCompleteFunc(const TSharedRef<IXmppConnection>& 
 	OnMUCRoomJoinPrivateComplete.Broadcast(bSuccess, static_cast<FString>(RoomId), Error);
 }
 
+void UChat::OnMUCRoomMemberJoinFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
+{
+	OnMUCRoomMemberJoin.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
+}
+
+void UChat::OnMUCRoomMemberExitFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
+{
+	OnMUCRoomMemberExit.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
+}
+
+void UChat::OnMUCRoomMemberChangedFunc(const TSharedRef<IXmppConnection>& Connection, const FXmppRoomId& RoomId, const FXmppUserJid& UserJid)
+{
+	OnMUCRoomMemberChanged.Broadcast(static_cast<FString>(RoomId), UserJid.Resource);
+}
 
 void UChat::MucCreate(const FString& UserName, const FString& RoomId, bool bIsPrivate, const FString& Password)
 {
