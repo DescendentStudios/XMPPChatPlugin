@@ -23,7 +23,7 @@ void UChatMember::ConvertFrom(const FXmppChatMember& ChatMember)
 	Status = UChatUtil::GetEUXmppPresenceStatus(ChatMember.UserPresence.Status);
 	bIsAvailable = ChatMember.UserPresence.bIsAvailable;
 	SentTime = ChatMember.UserPresence.SentTime;
-	ClientResource = ChatMember.UserPresence.ClientResource;
+	//ClientResource = ChatMember.UserPresence.ClientResource;
 	//NickName = ChatMember.UserPresence.NickName;
 	StatusStr = ChatMember.UserPresence.StatusStr;
 	Affiliation = UChatUtil::GetEUChatMemberRole(ChatMember.Affiliation);
