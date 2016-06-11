@@ -260,7 +260,13 @@ void UChat::PresenceGetRosterMembers(TArray<FString>& Members)
 {
 	if (XmppConnection->Presence().IsValid())
 	{
-		XmppConnection->Presence()->GetRosterMembers(Members);
+		TArray<FXmppUserJid> MemberJids;
+		XmppConnection->Presence()->GetRosterMembers(MemberJids);
+
+		for (auto& Jid : MemberJids)
+		{			
+			Members.Push(Jid.Id);
+		}
 	}
 }
 
@@ -377,7 +383,7 @@ void UChat::MucGetMembers(const FString& RoomId, TArray<UChatMember*>& Members)
 {
 	if (XmppConnection.IsValid() && XmppConnection->MultiUserChat().IsValid())
 	{
-		TArray< TSharedRef<FXmppChatMember> > OutMembers;
+		TArray< FXmppChatMemberRef > OutMembers;
 		XmppConnection->MultiUserChat()->GetMembers(RoomId, OutMembers);
 
 		Members.Empty();
